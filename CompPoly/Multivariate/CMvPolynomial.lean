@@ -93,7 +93,7 @@ def restrictDegree {n : ℕ} {R : Type} [BEq R] [LawfulBEq R] [Zero R]
 -/
 def aeval {n : ℕ} {R σ : Type} [CommSemiring R] [CommSemiring σ] [Algebra R σ]
     (f : Fin n → σ) (p : CMvPolynomial n R) : σ :=
-  sorry
+  eval₂ (algebraMap R σ) f p
 
 /-- Substitution: substitutes polynomials for variables.
 
@@ -101,7 +101,17 @@ def aeval {n : ℕ} {R σ : Type} [CommSemiring R] [CommSemiring σ] [Algebra R 
 -/
 def bind₁ {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
     (f : Fin n → CMvPolynomial m R) (p : CMvPolynomial n R) : CMvPolynomial m R :=
-  sorry
+  ExtTreeMap.foldl (fun acc mono c =>
+    acc + C c * (List.finRange n).foldl
+      (fun prod i => prod * (f i) ^ (mono.get i)) 1
+  ) 0 p.1
+
+lemma bind₁_def {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
+    (f : Fin n → CMvPolynomial m R) (p : CMvPolynomial n R) :
+    bind₁ f p = ExtTreeMap.foldl (fun acc mono c =>
+      acc + C c * (List.finRange n).foldl
+        (fun prod i => prod * (f i) ^ (mono.get i)) 1
+    ) 0 p.1 := rfl
 
 /-- Rename variables using a function.
 

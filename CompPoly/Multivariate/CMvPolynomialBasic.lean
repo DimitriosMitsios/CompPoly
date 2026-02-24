@@ -146,6 +146,13 @@ def monomial {n : ℕ} {R : Type} [BEq R] [LawfulBEq R] [Zero R]
     (m : CMvMonomial n) (c : R) : CMvPolynomial n R :=
   if c == 0 then 0 else Lawful.fromUnlawful <| Unlawful.ofList [(m, c)]
 
+/-- Multiset of all variable degrees appearing in the polynomial.
+
+  Each variable `i` appears `degreeOf i p` times in the multiset.
+-/
+def degrees {n : ℕ} {R : Type} [Zero R] (p : CMvPolynomial n R) : Multiset (Fin n) :=
+  Finset.univ.sum fun i => Multiset.replicate (p.degreeOf i) i
+
 /-- `degreeOf` is the multiplicity of a variable in `degrees`. -/
 lemma degreeOf_eq_count_degrees {n : ℕ} {R : Type} [Zero R]
     (i : Fin n) (p : CMvPolynomial n R) :
@@ -163,13 +170,6 @@ lemma degreeOf_eq_count_degrees {n : ℕ} {R : Type} [Zero R]
           simp [Multiset.count_replicate, eq_comm]
     _ = p.degreeOf i := by
           simp
-
-/-- Multiset of all variable degrees appearing in the polynomial.
-
-  Each variable `i` appears `degreeOf i p` times in the multiset.
--/
-def degrees {n : ℕ} {R : Type} [Zero R] (p : CMvPolynomial n R) : Multiset (Fin n) :=
-  Finset.univ.sum fun i => Multiset.replicate (p.degreeOf i) i
 
 /-- Extract the set of variables that appear in a polynomial.
 

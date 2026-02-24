@@ -411,21 +411,15 @@ lemma map_neg (a : CMvPolynomial n R) :
   unfold Lawful.neg Unlawful.neg Lawful.fromUnlawful
   simp only [ExtTreeMap.get?_eq_getElem?, Unlawful.zero_eq_zero]
   erw [Unlawful.filter_get]
-  by_cases h : (CMvMonomial.ofFinsupp m) ∈ a.1
-  · erw [ExtTreeMap.getElem?_map h]
-    have : ((a.1)[CMvMonomial.ofFinsupp m]?.getD 0) =
-      (a.1)[CMvMonomial.ofFinsupp m] := by simp [h]
-    erw [this]
-    simp
-  · erw [ExtTreeMap.getElem?_map_of_not_mem h]
-    have : ((a.1)[CMvMonomial.ofFinsupp m]?.getD 0) = 0 := by simp [h]
-    erw [this]
-    simp
+  erw [ExtTreeMap.getElem?_map]
+  cases h : (a.1)[CMvMonomial.ofFinsupp m]? with
+  | none => simp
+  | some v => simp
 
-@[simp]
 lemma map_sub (a b : CMvPolynomial n R) :
-    fromCMvPolynomial (a - b) = fromCMvPolynomial a - fromCMvPolynomial b := by
-  simp only [sub_eq_add_neg, map_add, map_neg]
+    fromCMvPolynomial (Sub.sub a b) = fromCMvPolynomial a - fromCMvPolynomial b := by
+  unfold Sub.sub Lawful.instSub Lawful.sub
+  rw [map_add, map_neg, sub_eq_add_neg]
 
 instance instCommRing : CommRing (CPoly.CMvPolynomial n R) where
   neg_add_cancel a := by
@@ -434,9 +428,9 @@ instance instCommRing : CommRing (CPoly.CMvPolynomial n R) where
   mul_comm := by
     aesop (add safe apply _root_.mul_comm)
   zsmul := zsmulRec
-  zsmul_zero' := by simp [zsmulRec]
-  zsmul_succ' := by intro n x; simp [zsmulRec, add_comm]
-  zsmul_neg' := by intro n x; simp [zsmulRec, negSucc_zsmul]
+  zsmul_zero' := fun _ => rfl
+  zsmul_succ' := fun _ _ => rfl
+  zsmul_neg' := fun _ _ => rfl
 
 end CommRingBridge
 

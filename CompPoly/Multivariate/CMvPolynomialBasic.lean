@@ -9,10 +9,17 @@ import Mathlib.Algebra.Algebra.Basic
 import Mathlib.Algebra.Ring.Hom.Defs
 
 /-!
-# Computable multivariate polynomials (basic definitions)
+# Computable multivariate polynomials
 
-Basic definitions for computable multivariate polynomials, extracted to break
-a circular dependency between `CMvPolynomial` and `MvPolyEquiv`.
+Polynomials of the form `α₁ * m₁ + α₂ * m₂ + ... + αₖ * mₖ` where `αᵢ` is any semiring
+and `mᵢ` is a `CMvMonomial`.
+
+This is implemented as a wrapper around `CPoly.Lawful`, which ensures that all stored
+coefficients are non-zero.
+
+This file contains the core type definition and basic operations. Higher-level definitions
+that depend on ring instances (monomial orders, `rename`, `aeval`, etc.) are in
+`CMvPolynomial.lean`. The `CommSemiring` and `CommRing` instances are in `MvPolyEquiv.lean`.
 
 ## Main definitions
 
@@ -20,8 +27,12 @@ a circular dependency between `CMvPolynomial` and `MvPolyEquiv`.
   with coefficients in `R`.
 * `CPoly.CMvPolynomial.C`: Constant polynomial constructor.
 * `CPoly.CMvPolynomial.X`: Variable polynomial constructor.
+* `CPoly.CMvPolynomial.monomial`: Monomial constructor.
 * `CPoly.CMvPolynomial.coeff`: Extract the coefficient of a monomial.
 * `CPoly.CMvPolynomial.eval₂`, `CPoly.CMvPolynomial.eval`: Polynomial evaluation.
+* `CPoly.CMvPolynomial.support`, `CPoly.CMvPolynomial.totalDegree`,
+  `CPoly.CMvPolynomial.degreeOf`, `CPoly.CMvPolynomial.degrees`,
+  `CPoly.CMvPolynomial.vars`: Degree and support queries.
 -/
 namespace CPoly
 

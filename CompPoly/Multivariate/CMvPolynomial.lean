@@ -6,15 +6,23 @@ Authors: Frantisek Silvasi, Julian Sutherland, Andrei Burdușa, Derek Sorensen
 import CompPoly.Multivariate.MvPolyEquiv
 
 /-!
-# Computable multivariate polynomials (higher-level definitions)
+# Computable multivariate polynomials (extended operations)
 
-This file contains higher-level definitions for computable multivariate polynomials
-that depend on the ring equivalence with `MvPolynomial`.
+Operations on `CMvPolynomial` that depend on ring instances from `MvPolyEquiv.lean`,
+such as monomial orders, leading terms, restriction, variable renaming, and substitution.
 
-The basic definitions (`CMvPolynomial`, `C`, `X`, `coeff`, `eval`, etc.) are in
-`CMvPolynomialBasic.lean`.
+The core type and basic operations (`CMvPolynomial`, `C`, `X`, `coeff`, `eval`, etc.)
+are in `CMvPolynomialBasic.lean`. The `CommSemiring` and `CommRing` instances are in
+`MvPolyEquiv.lean`.
 
-The `CommSemiring` and `CommRing` instances are in `MvPolyEquiv.lean`.
+## Main definitions
+
+* `MonomialOrder`: Typeclass for comparing monomials.
+* `leadingMonomial`, `leadingCoeff`: Leading term according to a monomial order.
+* `restrictBy`, `restrictTotalDegree`, `restrictDegree`: Filter monomials by predicates.
+* `rename`: Rename variables using a function `Fin n → Fin m`.
+* `aeval`: Algebra evaluation.
+* `bind₁`: Substitution of polynomials for variables.
 -/
 namespace CPoly
 
@@ -66,6 +74,10 @@ def restrictBy {n : ℕ} {R : Type} [BEq R] [LawfulBEq R] [Zero R]
     (p : CMvPolynomial n R) : CMvPolynomial n R :=
   Lawful.fromUnlawful <| p.1.filter (fun m _ => decide (keep m))
 
+/-- Restrict polynomial to monomials with total degree ≤ d.
+
+  Filters out all monomials where `m.totalDegree > d`.
+-/
 def restrictTotalDegree {n : ℕ} {R : Type} [BEq R] [LawfulBEq R] [Zero R]
     (d : ℕ) (p : CMvPolynomial n R) : CMvPolynomial n R :=
   restrictBy (fun m => m.totalDegree ≤ d) p

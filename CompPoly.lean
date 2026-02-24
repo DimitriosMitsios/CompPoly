@@ -11,6 +11,7 @@ import CompPoly.Data.Vector.Basic
 import CompPoly.Multilinear.Basic
 import CompPoly.Multilinear.Equiv
 import CompPoly.Multivariate.CMvMonomial
+import CompPoly.Multivariate.CMvPolynomialBasic
 import CompPoly.Multivariate.CMvPolynomial
 import CompPoly.Multivariate.CMvPolynomialEvalLemmas
 import CompPoly.Multivariate.Restrict

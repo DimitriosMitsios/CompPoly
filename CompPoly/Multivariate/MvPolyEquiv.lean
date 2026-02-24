@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Frantisek Silvasi, Julian Sutherland, Andrei Burdușa
 -/
 import Batteries.Data.Vector.Lemmas
-import CompPoly.Multivariate.CMvPolynomial
+import CompPoly.Multivariate.CMvPolynomialBasic
 import Mathlib.Algebra.MvPolynomial.Basic
 import Mathlib.Algebra.Ring.Defs
 import CompPoly.Multivariate.Lawful
@@ -396,6 +396,49 @@ instance {n : ℕ} : CommSemiring (CPoly.CMvPolynomial n R) where
   npow_zero := by intro x; simp [npowRecAuto, npowRec]
   npow_succ := by intro n x; simp [npowRecAuto, npowRec]
   mul_comm := by aesop (add safe apply _root_.mul_comm)
+
+section CommRingBridge
+
+variable {n : ℕ} {R : Type} [CommRing R] [BEq R] [LawfulBEq R]
+
+@[simp]
+lemma map_neg (a : CMvPolynomial n R) :
+    fromCMvPolynomial (-a) = -fromCMvPolynomial a := by
+  ext m
+  rw [MvPolynomial.coeff_neg, coeff_eq, coeff_eq]
+  unfold CMvPolynomial.coeff
+  unfold_projs
+  unfold Lawful.neg Unlawful.neg Lawful.fromUnlawful
+  simp only [ExtTreeMap.get?_eq_getElem?, Unlawful.zero_eq_zero]
+  erw [Unlawful.filter_get]
+  by_cases h : (CMvMonomial.ofFinsupp m) ∈ a.1
+  · erw [ExtTreeMap.getElem?_map h]
+    have : ((a.1)[CMvMonomial.ofFinsupp m]?.getD 0) =
+      (a.1)[CMvMonomial.ofFinsupp m] := by simp [h]
+    erw [this]
+    simp
+  · erw [ExtTreeMap.getElem?_map_of_not_mem h]
+    have : ((a.1)[CMvMonomial.ofFinsupp m]?.getD 0) = 0 := by simp [h]
+    erw [this]
+    simp
+
+@[simp]
+lemma map_sub (a b : CMvPolynomial n R) :
+    fromCMvPolynomial (a - b) = fromCMvPolynomial a - fromCMvPolynomial b := by
+  simp only [sub_eq_add_neg, map_add, map_neg]
+
+instance instCommRing : CommRing (CPoly.CMvPolynomial n R) where
+  neg_add_cancel a := by
+    apply fromCMvPolynomial_injective
+    simp [map_neg, map_add, map_zero]
+  mul_comm := by
+    aesop (add safe apply _root_.mul_comm)
+  zsmul := zsmulRec
+  zsmul_zero' := by simp [zsmulRec]
+  zsmul_succ' := by intro n x; simp [zsmulRec, add_comm]
+  zsmul_neg' := by intro n x; simp [zsmulRec, negSucc_zsmul]
+
+end CommRingBridge
 
 noncomputable def polyRingEquiv :
   RingEquiv (CPoly.CMvPolynomial n R) (MvPolynomial (Fin n) R) where

@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 CompPoly. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Frantisek Silvasi, Julian Sutherland, Andrei Burdușa
+Authors: Frantisek Silvasi, Julian Sutherland, Andrei Burdușa, Dimitris Mitsios
 -/
 import Batteries.Data.Vector.Lemmas
 import CompPoly.Multivariate.CMvPolynomialBasic
@@ -420,7 +420,7 @@ lemma map_sub (a b : CMvPolynomial n R) :
   unfold Sub.sub Lawful.instSub Lawful.sub
   rw [map_add, map_neg, sub_eq_add_neg]
 
-instance instCommRing : CommRing (CPoly.CMvPolynomial n R) where
+instance : CommRing (CPoly.CMvPolynomial n R) where
   neg_add_cancel a := by
     apply fromCMvPolynomial_injective
     simp [map_neg, map_add, map_zero]

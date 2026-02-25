@@ -117,6 +117,8 @@ def rename {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
 
 /-- Scalar multiplication with zero handling.
 
+  This is automatically provided by `Module`, but we list it for completeness.
+
   TODO: Requires `Module` instance (see above).
 -/
 instance {n : ℕ} {R : Type} [Zero R] [BEq R] [LawfulBEq R] : SMulZeroClass R (CMvPolynomial n R) :=

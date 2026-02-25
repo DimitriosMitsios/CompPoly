@@ -65,10 +65,7 @@ def leadingCoeff {n : ℕ} {R : Type} [Zero R] [MonomialOrder n]
     (p : CMvPolynomial n R) : R :=
   sorry
 
-/-- Restrict polynomial to monomials satisfying a predicate.
-
-  Filters out all monomials where `keep m` is false.
--/
+/-- Filter a polynomial, keeping only monomials for which `keep m` is true. -/
 def restrictBy {n : ℕ} {R : Type} [BEq R] [LawfulBEq R] [Zero R]
     (keep : CMvMonomial n → Prop) [DecidablePred keep]
     (p : CMvPolynomial n R) : CMvPolynomial n R :=
@@ -120,14 +117,15 @@ def rename {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
 
 /-- Scalar multiplication with zero handling.
 
-  TODO: Requires `Module` instance.
+  TODO: Requires `Module` instance (see above).
 -/
 instance {n : ℕ} {R : Type} [Zero R] [BEq R] [LawfulBEq R] : SMulZeroClass R (CMvPolynomial n R) :=
   sorry
 
 /-- Convert sum representation to iterative form.
 
-  TODO: Clarify intended behavior.
+  TODO: Clarify intended behavior - may be related to converting between different
+  polynomial representations or evaluation strategies.
 -/
 def sumToIter {n : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
     (p : CMvPolynomial n R) : CMvPolynomial n R :=
@@ -135,7 +133,7 @@ def sumToIter {n : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
 
 end CMvPolynomial
 
--- TODO: Phase 1 items:
+-- TODO: Phase 1 items requiring Semiring/CommSemiring instances from MvPolyEquiv.lean:
 -- TODO: `Algebra R (CMvPolynomial n R)` instance
 -- TODO: `Module R (CMvPolynomial n R)` instance
 -- TODO: `eval₂Hom` - Ring homomorphism for evaluation

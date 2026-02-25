@@ -405,13 +405,12 @@ variable {n : ℕ} {R : Type} [CommRing R] [BEq R] [LawfulBEq R]
 lemma map_neg (a : CMvPolynomial n R) :
     fromCMvPolynomial (-a) = -fromCMvPolynomial a := by
   ext m
-  rw [MvPolynomial.coeff_neg, coeff_eq, coeff_eq]
+  simp only [MvPolynomial.coeff_neg, coeff_eq]
   unfold CMvPolynomial.coeff
   unfold_projs
   unfold Lawful.neg Unlawful.neg Lawful.fromUnlawful
   simp only [ExtTreeMap.get?_eq_getElem?, Unlawful.zero_eq_zero]
-  erw [Unlawful.filter_get]
-  erw [ExtTreeMap.getElem?_map]
+  erw [Unlawful.filter_get, ExtTreeMap.getElem?_map]
   cases h : (a.1)[CMvMonomial.ofFinsupp m]? with
   | none => simp
   | some v => simp

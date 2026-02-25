@@ -188,6 +188,34 @@ lemma fromCMvPolynomial_C {k : ℕ} (c : R) :
   rw [C_eq_monomial, fromCMvPolynomial_monomial, toFinsupp_zero,
       ← MvPolynomial.C_apply]
 
+/-! ### C as a ring homomorphism -/
+
+lemma C_one {k : ℕ} : CMvPolynomial.C (n := k) (1 : R) = 1 := by
+  apply fromCMvPolynomial_injective
+  rw [fromCMvPolynomial_C, map_one, MvPolynomial.C_1]
+
+lemma C_add {k : ℕ} (a b : R) :
+    CMvPolynomial.C (n := k) (a + b) = CMvPolynomial.C a + CMvPolynomial.C b := by
+  apply fromCMvPolynomial_injective
+  simp [fromCMvPolynomial_C, map_add, MvPolynomial.C_add]
+
+lemma C_mul {k : ℕ} (a b : R) :
+    CMvPolynomial.C (n := k) (a * b) = CMvPolynomial.C a * CMvPolynomial.C b := by
+  apply fromCMvPolynomial_injective
+  simp [fromCMvPolynomial_C, map_mul, MvPolynomial.C_mul]
+
+/-- `CMvPolynomial.C` as a `RingHom`. -/
+def CRingHom (k : ℕ) (R : Type) [CommSemiring R] [BEq R] [LawfulBEq R] :
+    R →+* CMvPolynomial k R where
+  toFun := CMvPolynomial.C
+  map_zero' := Lawful.C_zero
+  map_one' := C_one
+  map_add' := C_add
+  map_mul' := C_mul
+
+instance algebraCMvPolynomial {k : ℕ} : Algebra R (CMvPolynomial k R) :=
+  (CRingHom k R).toAlgebra
+
 /-! ### Algebraic properties of rename -/
 
 /-- Constants are unchanged under renaming. -/

@@ -7,11 +7,14 @@ import CompPoly.Multivariate.Aeval
 import Mathlib.Algebra.MvPolynomial.Monad
 
 /-!
-# Properties of variable substitution (`bind₁`) for `CMvPolynomial`
+# Variable substitution (`bind₁`) for `CMvPolynomial`
 
-This file proves properties of the `bind₁` function defined in `CMvPolynomial.lean`,
-by transferring results from Mathlib's `MvPolynomial.bind₁` through the
-`fromCMvPolynomial` equivalence.
+This file defines `bind₁` and proves its properties by transferring results
+from Mathlib's `MvPolynomial.bind₁` through the `fromCMvPolynomial` equivalence.
+
+## Main definitions
+
+* `CMvPolynomial.bind₁` — substitution of polynomials for variables, defined via `aeval`.
 
 ## Main results
 
@@ -28,49 +31,28 @@ open Std CMvPolynomial
 
 variable {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
 
-/-! ### Helper lemmas -/
+/-- Substitution: substitutes polynomials for variables.
 
-/-- `fromCMvPolynomial` preserves exponentiation. -/
-lemma fromCMvPolynomial_pow {k : ℕ} (p : CMvPolynomial k R) (e : ℕ) :
-    fromCMvPolynomial (p ^ e) = (fromCMvPolynomial p) ^ e := by
-  induction e with
-  | zero => simp [map_one]
-  | succ e ih => simp [pow_succ, map_mul, ih]
+  Given `f : Fin n → CMvPolynomial m R`, substitutes `f i` for variable `X i`.
+  Defined as `aeval` using the `Algebra R (CMvPolynomial m R)` instance.
+-/
+def CMvPolynomial.bind₁ {n m : ℕ} {R : Type} [CommSemiring R] [BEq R] [LawfulBEq R]
+    (f : Fin n → CMvPolynomial m R) (p : CMvPolynomial n R) : CMvPolynomial m R :=
+  aeval f p
 
-private lemma list_foldl_mul_eq_mul_prod [Monoid β]
-    (l : List α) (f : α → β) (init : β) :
-    l.foldl (fun acc x => acc * f x) init = init * (l.map f).prod := by
-  induction l generalizing init with
-  | nil => simp
-  | cons h t ih => simp [ih, mul_assoc]
-
-private lemma fromCMvPolynomial_list_prod {k : ℕ}
-    (l : List (CMvPolynomial k R)) :
-    fromCMvPolynomial l.prod = (l.map fromCMvPolynomial).prod := by
-  induction l with
-  | nil => simp [map_one]
-  | cons h t ih => simp [List.prod_cons, map_mul, ih]
-
-/-- The inner product fold in `bind₁` corresponds to a `Finsupp.prod` under
-`fromCMvPolynomial`. -/
-lemma fromCMvPolynomial_inner_prod
-    (f : Fin n → CMvPolynomial m R) (mono : CMvMonomial n) :
-    fromCMvPolynomial ((List.finRange n).foldl
-      (fun prod i => prod * (f i) ^ (mono.get i)) 1) =
-    Finsupp.prod (CMvMonomial.toFinsupp mono)
-      (fun i k => fromCMvPolynomial (f i) ^ k) := by
-  rw [list_foldl_mul_eq_mul_prod, one_mul, fromCMvPolynomial_list_prod]
-  simp only [List.map_map, Function.comp_def, fromCMvPolynomial_pow]
-  rw [← List.ofFn_eq_map, List.prod_ofFn]
-  unfold Finsupp.prod
-  symm
-  apply Finset.prod_subset
-  · intro x hx; exact Finset.mem_univ x
-  · intro x _ hx
-    rw [Finsupp.notMem_support_iff] at hx
-    simp [toFinsupp_apply, hx]
-
-/-! ### Main correspondence lemma -/
+/-- `polyRingEquiv` as an `AlgHom` from `CMvPolynomial` to `MvPolynomial`. -/
+private noncomputable def fromCMvPolynomialAlgHom :
+    CMvPolynomial m R →ₐ[R] MvPolynomial (Fin m) R where
+  toFun := fromCMvPolynomial
+  map_one' := map_one
+  map_mul' := map_mul
+  map_zero' := map_zero
+  map_add' := map_add
+  commutes' := fun c => by
+    show fromCMvPolynomial (algebraMap R (CMvPolynomial m R) c) = algebraMap R _ c
+    rw [MvPolynomial.algebraMap_eq]
+    show fromCMvPolynomial ((CRingHom m R) c) = MvPolynomial.C c
+    simp [CRingHom, fromCMvPolynomial_C]
 
 /-- `CMvPolynomial.bind₁` agrees with `MvPolynomial.bind₁` under the
 `fromCMvPolynomial` equivalence. -/
@@ -79,9 +61,25 @@ lemma fromCMvPolynomial_bind₁ (f : Fin n → CMvPolynomial m R)
     fromCMvPolynomial (CMvPolynomial.bind₁ f p) =
     MvPolynomial.bind₁ (fun i => fromCMvPolynomial (f i))
       (fromCMvPolynomial p) := by
-  sorry
-
-/-! ### Transfer properties -/
+  -- Both sides are algebra homs in p. Show they agree on generators X i and constants C c.
+  -- Both sides are algebra hom compositions that agree on generators.
+  -- LHS alg hom: fromCMvPolynomialAlgHom ∘ₐ (CMvPolynomial.aeval f viewed as AlgHom)
+  -- RHS alg hom: MvPolynomial.bind₁ (fromCMvPolynomial ∘ f) = MvPolynomial.aeval (fromCMvPolynomial ∘ f)
+  -- Use MvPolynomial.algHom_ext: two AlgHoms from MvPolynomial agree iff they agree on X i.
+  have : fromCMvPolynomialAlgHom.comp (MvPolynomial.aeval f) =
+      MvPolynomial.aeval (fun i => fromCMvPolynomial (f i)) := by
+    apply MvPolynomial.algHom_ext
+    intro i
+    simp [fromCMvPolynomialAlgHom, MvPolynomial.aeval_X]
+  unfold CMvPolynomial.bind₁ MvPolynomial.bind₁
+  -- aeval_equiv: CMvPolynomial.aeval f p = MvPolynomial.aeval f (fromCMvPolynomial p)
+  -- Here σ = CMvPolynomial m R, so both sides are CMvPolynomial m R
+  -- Applying fromCMvPolynomial to both sides of aeval_equiv:
+  conv_lhs => rw [aeval_equiv]
+  -- Now LHS = fromCMvPolynomial (MvPolynomial.aeval f (fromCMvPolynomial p))
+  -- = (fromCMvPolynomialAlgHom.comp (MvPolynomial.aeval f)) (fromCMvPolynomial p)
+  show (fromCMvPolynomialAlgHom.comp (MvPolynomial.aeval f)) (fromCMvPolynomial p) = _
+  rw [this]
 
 /-- Substitution on a constant polynomial returns the constant. -/
 @[simp]

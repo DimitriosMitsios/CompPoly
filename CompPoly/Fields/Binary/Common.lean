@@ -274,10 +274,20 @@ def clMul (a b : B256) : B256 :=
 -- Return the result xy = z2 B^{2m} + z1 B^{m} + z0
 -- all clMul_karatsuba properties must be proven
 def clMul_karatsuba {w : Nat} (a b: BitVec w) : BitVec w :=
-  let B : ℕ := 2 -- B denotes the base of the binary number system
-  let m : ℕ := Nat.ceil w/2 -- m is the bit position where Karatsuba splits the input number is two parts
-  let a₁ : BitVec (w - m) := BitVec.extractLsb (w-1) m a
-  sorry
+  if h : w <= 1 then a &&& b
+  else
+      let m : ℕ := w/2 -- m is the bit position where Karatsuba splits the input number into two parts
+      let a_hi : BitVec (w - m) := BitVec.extractLsb' m (w - m) a
+      let a_lo : BitVec m := BitVec.extractLsb' 0 m a
+      let b_hi : BitVec (w - m) := BitVec.extractLsb' m (w - m) b
+      let b_lo : BitVec m := BitVec.extractLsb' 0 m b
+      let z_0 : BitVec m := clMul_karatsuba a_lo b_lo
+      let z_2 : BitVec (w - m) := clMul_karatsuba a_hi b_hi
+      let z_3 : BitVec (w - m) := clMul_karatsuba (a_hi ^^^ a_lo.truncate (w-m) ) (b_hi ^^^ b_lo.truncate (w-m))
+      let z_1 : BitVec w := z_3.truncate w ^^^ z_2.truncate w ^^^ z_0.truncate w
+      (z_2.truncate w <<< (2 * m)) ^^^ (z_1 <<< m) ^^^ z_0.truncate w
+      termination_by w
+      decreasing_by all_goals omega
 
 /-- Carry-less squaring of a 128-bit vector. -/
 def clSq (a : B128) : B256 :=

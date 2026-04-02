@@ -269,6 +269,16 @@ def clMul (a b : B256) : B256 :=
   (Finset.univ : Finset (Fin 256)).fold BitVec.xor 0
       (fun i => if a.getLsb i then b <<< i.val else 0)
 
+-- TODO: Define the base B=2 and the number m < n where n the length of a, b
+-- Then define z0 = x0 + y0, z1 = x1y0 + x0y1, z2 = x1y1 for z1, z2 reuse Karatsuba
+-- Return the result xy = z2 B^{2m} + z1 B^{m} + z0
+-- all clMul_karatsuba properties must be proven
+def clMul_karatsuba {w : Nat} (a b: BitVec w) : BitVec w :=
+  let B : ℕ := 2 -- B denotes the base of the binary number system
+  let m : ℕ := Nat.ceil w/2 -- m is the bit position where Karatsuba splits the input number is two parts
+  let a₁ : BitVec (w - m) := BitVec.extractLsb (w-1) m a
+  sorry
+
 /-- Carry-less squaring of a 128-bit vector. -/
 def clSq (a : B128) : B256 :=
   let a256 := to256 a

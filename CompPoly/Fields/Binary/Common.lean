@@ -269,25 +269,46 @@ def clMul (a b : B256) : B256 :=
   (Finset.univ : Finset (Fin 256)).fold BitVec.xor 0
       (fun i => if a.getLsb i then b <<< i.val else 0)
 
--- TODO: Define the base B=2 and the number m < n where n the length of a, b
--- Then define z0 = x0 + y0, z1 = x1y0 + x0y1, z2 = x1y1 for z1, z2 reuse Karatsuba
--- Return the result xy = z2 B^{2m} + z1 B^{m} + z0
--- all clMul_karatsuba properties must be proven
-def clMul_karatsuba {w : Nat} (a b: BitVec w) : BitVec w :=
-  if h : w <= 1 then a &&& b
-  else
-      let m : ℕ := w/2 -- m is the bit position where Karatsuba splits the input number into two parts
-      let a_hi : BitVec (w - m) := BitVec.extractLsb' m (w - m) a
-      let a_lo : BitVec m := BitVec.extractLsb' 0 m a
-      let b_hi : BitVec (w - m) := BitVec.extractLsb' m (w - m) b
-      let b_lo : BitVec m := BitVec.extractLsb' 0 m b
-      let z_0 : BitVec m := clMul_karatsuba a_lo b_lo
-      let z_2 : BitVec (w - m) := clMul_karatsuba a_hi b_hi
-      let z_3 : BitVec (w - m) := clMul_karatsuba (a_hi ^^^ a_lo.truncate (w-m) ) (b_hi ^^^ b_lo.truncate (w-m))
-      let z_1 : BitVec w := z_3.truncate w ^^^ z_2.truncate w ^^^ z_0.truncate w
-      (z_2.truncate w <<< (2 * m)) ^^^ (z_1 <<< m) ^^^ z_0.truncate w
-      termination_by w
-      decreasing_by all_goals omega
+/-- Optimized carry-less multiplication of two 128-bit values, producing a
+    256-bit result. Uses `Fin.foldl` and hoists `to256 b` out of the loop.
+    This is the fastest variant benchmarked (see `notes-karatsuba.md`). -/
+@[inline] def clMul128_opt (a b : B128) : B256 :=
+  let b256 := to256 b
+  Fin.foldl 128 (init := (0 : B256))
+    (fun acc i => if a.getLsbD i.val then acc ^^^ (b256 <<< i.val) else acc)
+
+private def mask64_128 : B128 := (1 <<< 64) - 1
+
+/-- 64-bit carry-less multiply on B128 inputs, returning B256. -/
+@[inline] private def clMul64_128 (a b : B128) : B256 :=
+  let b256 := to256 b
+  Fin.foldl 64 (init := (0 : B256))
+    (fun acc i => if a.getLsbD i.val then acc ^^^ (b256 <<< i.val) else acc)
+
+/-- Single-level Karatsuba on B128 inputs: splits each operand at bit 64,
+    uses 3 sub-multiplies instead of 4, and recombines via XOR/shift. -/
+@[inline] def clMul128_karatsuba (a b : B128) : B256 :=
+  let a_lo := a &&& mask64_128
+  let a_hi := a >>> 64
+  let b_lo := b &&& mask64_128
+  let b_hi := b >>> 64
+  let z_0 := clMul64_128 a_lo b_lo
+  let z_2 := clMul64_128 a_hi b_hi
+  let z_3 := clMul64_128 (a_lo ^^^ a_hi) (b_lo ^^^ b_hi)
+  let z_1 := z_3 ^^^ z_0 ^^^ z_2
+  z_0 ^^^ (z_1 <<< 64) ^^^ (z_2 <<< 128)
+
+
+def bvToU64 (v : BitVec 64) : UInt64 :=
+  UInt64.ofNat (BitVec.toNat v)
+
+def U64Tobv (n : UInt64) : BitVec 64 :=
+  BitVec.ofNat 64 n.toNat
+
+def split (a : B128) : UInt64 × UInt64 :=
+  let alo := bvToU64 (a.extractLsb' 0 64)
+  let ahi := bvToU64 (a.extractLsb' 64 64)
+  (alo, ahi)
 
 /-- Carry-less squaring of a 128-bit vector. -/
 def clSq (a : B128) : B256 :=

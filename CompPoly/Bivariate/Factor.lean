@@ -112,28 +112,134 @@ Alternatively, use `Polynomial.eq_of_dvd_of_degree_le_of_leadingCoeff` or
 -/
 
 -- Step 1: remainder of synthetic division = evaluation at f
+theorem divByLinearY_prefix_fold_eq_divX_fold [Semiring R] [BEq R] [LawfulBEq R] [Nontrivial R] (Q : CBivariate R) (f : CPolynomial R) (k : ℕ) : List.foldl (fun x k_1 => (CPolynomial.coeff Q (k + 1 - k_1) + f * x.1, x.2.push (CPolynomial.coeff Q (k + 1 - k_1) + f * x.1))) (CPolynomial.coeff Q (k + 2), #[CPolynomial.coeff Q (k + 2)]) (List.range k) = List.foldl (fun x k_1 => ((CPolynomial.divX Q).coeff (k - k_1) + f * x.1, x.2.push ((CPolynomial.divX Q).coeff (k - k_1) + f * x.1))) ((CPolynomial.divX Q).coeff (k + 1), #[(CPolynomial.divX Q).coeff (k + 1)]) (List.range k) := by
+  rw [show (CPolynomial.coeff Q (k + 2), #[CPolynomial.coeff Q (k + 2)]) =
+      ((CPolynomial.divX Q).coeff (k + 1), #[(CPolynomial.divX Q).coeff (k + 1)]) by
+    simpa using congrArg (fun c => (c, #[c]))
+      ((CPolynomial.coeff_divX (p := Q) (i := k + 1)).symm)]
+  apply List.foldl_ext
+  intro a i hi
+  rcases a with ⟨b, acc⟩
+  have hi' : i < k := List.mem_range.mp hi
+  have hidx : k + 1 - i = (k - i) + 1 := by omega
+  simpa [hidx] using congrArg (fun c => (c + f * b, acc.push (c + f * b)))
+    ((CPolynomial.coeff_divX (p := Q) (i := k - i)).symm)
+
+theorem evalYPoly_divX_step [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] (Q : CBivariate R) (f : CPolynomial R) : evalYPoly f Q = CPolynomial.coeff Q 0 + f * evalYPoly f (CPolynomial.divX Q) := by
+  change CPolynomial.eval f Q = CPolynomial.coeff Q 0 + f * CPolynomial.eval f (CPolynomial.divX Q)
+  conv_lhs => rw [CPolynomial.X_mul_divX_add (p := Q)]
+  rw [CPolynomial.eval_toPoly, CPolynomial.toPoly_add, Polynomial.eval_add]
+  rw [CPolynomial.toPoly_mul, Polynomial.eval_mul]
+  rw [CPolynomial.X_toPoly, Polynomial.eval_X]
+  rw [CPolynomial.C_toPoly, Polynomial.eval_C]
+  rw [← CPolynomial.eval_toPoly (x := f) (p := CPolynomial.divX Q)]
+  rw [add_comm]
+
+theorem natDegreeY_divX [Semiring R] [BEq R] [LawfulBEq R] [Nontrivial R] (Q : CBivariate R) : natDegreeY (CPolynomial.divX Q) = natDegreeY Q - 1 := by
+  show CPolynomial.natDegree (CPolynomial.divX Q) = CPolynomial.natDegree Q - 1
+  rw [CPolynomial.natDegree_toPoly (p := CPolynomial.divX Q)]
+  rw [CPolynomial.divX_toPoly (p := Q)]
+  rw [Polynomial.natDegree_divX_eq_natDegree_tsub_one]
+  rw [← CPolynomial.natDegree_toPoly (p := Q)]
+
+theorem divByLinearY_rem_recursion [Semiring R] [BEq R] [LawfulBEq R] [Nontrivial R] (Q : CBivariate R) (f : CPolynomial R) (hQ : natDegreeY Q ≠ 0) : (divByLinearY Q f).2 = CPolynomial.coeff Q 0 + f * (divByLinearY (CPolynomial.divX Q) f).2 := by
+  cases hdeg : natDegreeY Q with
+  | zero =>
+      exact (hQ hdeg).elim
+  | succ m =>
+      cases m with
+      | zero =>
+          have hdivdeg : natDegreeY (CPolynomial.divX Q) = 0 := by
+            simpa [hdeg] using (natDegreeY_divX (Q := Q))
+          rw [divByLinearY, hdeg, if_neg (Nat.succ_ne_zero 0)]
+          conv_rhs => rw [divByLinearY, hdivdeg, if_pos rfl]
+          change CPolynomial.coeff Q 0 + f * CPolynomial.coeff Q 1 =
+            CPolynomial.coeff Q 0 + f * CPolynomial.coeff (CPolynomial.divX Q) 0
+          rw [CPolynomial.coeff_divX]
+      | succ k =>
+          have hdeg' : natDegreeY Q = k + 2 := by
+            simpa [Nat.succ_eq_add_one, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hdeg
+          have hdivdeg : natDegreeY (CPolynomial.divX Q) = k + 1 := by
+            simpa [hdeg', Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using
+              (natDegreeY_divX (Q := Q))
+          have hk2nz : k + 2 ≠ 0 := by omega
+          have hk1nz : k + 1 ≠ 0 := by omega
+          have hk21 : k + 2 - 1 = k + 1 := by omega
+          rw [divByLinearY, hdeg', if_neg hk2nz]
+          rw [hk21]
+          conv_rhs => rw [divByLinearY, hdivdeg, if_neg hk1nz]
+          change
+            CPolynomial.coeff Q 0 +
+                f *
+                  (List.foldl
+                      (fun x k_1 =>
+                        (CPolynomial.coeff Q (k + 1 - k_1) + f * x.1,
+                          x.2.push (CPolynomial.coeff Q (k + 1 - k_1) + f * x.1)))
+                      (CPolynomial.coeff Q (k + 2), #[CPolynomial.coeff Q (k + 2)])
+                      (List.range (k + 1))).1
+              =
+            CPolynomial.coeff Q 0 +
+                f *
+                  (CPolynomial.coeff (CPolynomial.divX Q) 0 +
+                    f *
+                      (List.foldl
+                          (fun x k_1 =>
+                            (CPolynomial.coeff (CPolynomial.divX Q) (k - k_1) + f * x.1,
+                              x.2.push
+                                (CPolynomial.coeff (CPolynomial.divX Q) (k - k_1) + f * x.1)))
+                          (CPolynomial.coeff (CPolynomial.divX Q) (k + 1),
+                            #[CPolynomial.coeff (CPolynomial.divX Q) (k + 1)])
+                          (List.range k)).1)
+          congr 1
+          congr 1
+          rw [List.range_succ]
+          simp only [List.foldl_concat]
+          rw [divByLinearY_prefix_fold_eq_divX_fold (Q := Q) (f := f) (k := k)]
+          have hlast : k + 1 - k = 1 := by omega
+          rw [hlast]
+          have hcoeff0 : CPolynomial.coeff (CPolynomial.divX Q) 0 = CPolynomial.coeff Q 1 := by
+            simpa using (CPolynomial.coeff_divX (p := Q) (i := 0))
+          rw [hcoeff0]
+
 theorem divByLinearY_rem_eq_eval [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R]
     (Q : CBivariate R) (f : CPolynomial R) :
     (divByLinearY Q f).2 = evalYPoly f Q := by
-  show (divByLinearY Q f).2 = Q.val.eval f
-  unfold divByLinearY natDegreeY
-  simp only []
-  split
-  · -- n = 0: Q has degree 0, so rem = coeff Q 0 = eval f Q
-    rename_i h
-    change CPolynomial.coeff Q 0 = CPolynomial.Raw.eval f Q.val
+  refine Nat.strong_induction_on (p := fun n => ∀ Q : CBivariate R, Q.val.size = n → (divByLinearY Q f).2 = evalYPoly f Q) Q.val.size ?_ Q rfl
+  intro n ih Q hsize
+  by_cases hdeg : natDegreeY Q = 0
+  · rw [divByLinearY, if_pos hdeg]
     change CPolynomial.coeff Q 0 = CPolynomial.eval f Q
     rw [CPolynomial.eval_toPoly]
-    have hnd : (CPolynomial.toPoly Q).natDegree = 0 := CPolynomial.natDegree_toPoly Q ▸ h
-    rw [Polynomial.eq_C_of_natDegree_eq_zero hnd, Polynomial.eval_C]
-    exact CPolynomial.coeff_toPoly Q 0
-  · -- n > 0: the fold computes Horner evaluation
-    -- Goal: a_0 + f * b_last = Q.val.eval f
-    -- where b_last is the result of folding from a_n down to a_1
-    -- Both sides compute Σ aⱼ fʲ; the fold does it top-down (Horner),
-    -- eval does it bottom-up (sum of powers).
-    rename_i h
-    sorry
+    have hQnat : Q.natDegree = 0 := by
+      simpa [CBivariate.natDegreeY] using hdeg
+    have hdeg_toPoly : (CPolynomial.toPoly Q).natDegree = 0 := by
+      simpa [hQnat] using (CPolynomial.natDegree_toPoly (p := Q)).symm
+    rcases Polynomial.natDegree_eq_zero.mp hdeg_toPoly with ⟨a, ha⟩
+    have ha0 : a = (CPolynomial.toPoly Q).coeff 0 := by
+      have hcoeff := congrArg (fun p : Polynomial (CPolynomial R) => p.coeff 0) ha
+      simpa using hcoeff
+    rw [← ha, Polynomial.eval_C, CPolynomial.coeff_toPoly]
+    exact ha0.symm
+  · have hpos : 0 < Q.val.size := by
+      by_contra hzero
+      have hs : Q.val.size = 0 := Nat.eq_zero_of_not_pos hzero
+      have hval : Q.val = (#[] : CPolynomial.Raw (CPolynomial R)) :=
+        Array.eq_empty_of_size_eq_zero hs
+      have hQ0 : Q = 0 := by
+        apply CPolynomial.ext
+        simpa using hval
+      have hdeg0 : natDegreeY Q = 0 := by
+        rw [hQ0]
+        rfl
+      exact hdeg hdeg0
+    have hlt : (CPolynomial.divX Q).val.size < n := by
+      rw [← hsize]
+      exact CPolynomial.divX_size_lt Q hpos
+    have hrec := ih (CPolynomial.divX Q).val.size hlt (CPolynomial.divX Q) rfl
+    rw [divByLinearY_rem_recursion Q f hdeg]
+    rw [hrec]
+    exact (evalYPoly_divX_step Q f).symm
+
 
 -- Step 2–4: main correctness theorem
 theorem divByLinearY_spec [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R]

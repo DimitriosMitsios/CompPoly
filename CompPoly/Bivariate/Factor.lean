@@ -7,6 +7,10 @@ Authors: Dimitris Mitsios
 import CompPoly.Bivariate.Basic
 import CompPoly.Bivariate.ToPoly
 
+import Mathlib.Data.List.GetD
+import Mathlib.Data.List.Range
+import Mathlib.Algebra.Polynomial.Coeff
+import Mathlib.Algebra.Polynomial.Degree.Operations
 /-!
 # Factorisation of Computable Bivariate Polynomials
 
@@ -136,13 +140,257 @@ theorem divByLinearY_rem_eq_eval [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial 
     sorry
 
 -- Step 2–4: main correctness theorem
+theorem divByLinearY_const {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (a f : CPolynomial R) :
+  divByLinearY (CPolynomial.C a : CBivariate R) f = (0, a) := by
+  unfold divByLinearY
+  have hdeg : natDegreeY (CPolynomial.C a : CBivariate R) = 0 := by
+    rw [CBivariate.natDegreeY, CPolynomial.natDegree_toPoly, CPolynomial.C_toPoly]
+    by_cases ha : a = 0
+    · subst ha
+      simp
+    · simp [ha]
+  simp [hdeg]
+  simpa [CPolynomial.coeff] using (CPolynomial.coeff_C (R := CPolynomial R) (r := a) (i := 0))
+
+theorem divByLinearY_fold_split {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) (h : 1 < natDegreeY Q) :
+  let n := natDegreeY Q
+  let a : ℕ → CPolynomial R := fun j => CPolynomial.coeff Q j
+  let step : CPolynomial R × Array (CPolynomial R) → ℕ → CPolynomial R × Array (CPolynomial R) :=
+    fun x k =>
+      let bj := a (n - 1 - k) + f * x.1
+      (bj, x.2.push bj)
+  let res1 := (List.range (n - 2)).foldl step (a n, #[(a n)])
+  (List.range (n - 1)).foldl step (a n, #[(a n)]) =
+    (a 1 + f * res1.1, res1.2.push (a 1 + f * res1.1)) := by
+  dsimp
+  have hn2 : 2 ≤ natDegreeY Q := by omega
+  rw [show natDegreeY Q - 1 = (natDegreeY Q - 2) + 1 by omega]
+  rw [List.range_succ]
+  rw [List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  congr <;> omega
+
+theorem divByLinearY_quot_of_natDegreeY_one {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) (h : natDegreeY Q = 1) :
+  (divByLinearY Q f).1 = CPolynomial.C (CPolynomial.coeff Q 1) := by
+  simp [divByLinearY, h, CPolynomial.C]
+  rfl
+
+theorem divByLinearY_rem_formula {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) :
+  let quot := (divByLinearY Q f).1
+  let rem := (divByLinearY Q f).2
+  rem = CPolynomial.coeff Q 0 + f * CPolynomial.coeff quot 0 := by
+  unfold divByLinearY
+  by_cases h0 : natDegreeY Q = 0
+  · simp [h0]
+    change f * ((0 : CPolynomial.Raw (CPolynomial R)).coeff 0) = 0
+    simp [CPolynomial.Raw.coeff]
+  · simp [h0]
+    let n := Q.natDegreeY
+    let a : ℕ → CPolynomial R := fun j => CPolynomial.coeff Q j
+    let step : CPolynomial R × Array (CPolynomial R) → ℕ → CPolynomial R × Array (CPolynomial R) :=
+      fun x k =>
+        let bj := a (n - 1 - k) + f * x.1
+        (bj, x.2.push bj)
+    let res := (List.range (n - 1)).foldl step (a n, #[a n])
+    have hfold : ∀ l (b : CPolynomial R) (acc : Array (CPolynomial R)),
+        ((List.foldl step (b, acc.push b) l).2.reverse)[0]?.getD 0 =
+          (List.foldl step (b, acc.push b) l).1 := by
+      intro l
+      induction l with
+      | nil =>
+          intro b acc
+          simp [step]
+      | cons k l ih =>
+          intro b acc
+          simpa [List.foldl_cons, step] using ih (a (n - 1 - k) + f * b) (acc.push b)
+    have hres : (res.2.reverse)[0]?.getD 0 = res.1 := by
+      simpa [res, step] using hfold (List.range (n - 1)) (a n) (#[])
+    have htrim0 : (CPolynomial.Raw.trim res.2.reverse)[0]?.getD 0 = (res.2.reverse)[0]?.getD 0 := by
+      simpa [CPolynomial.Raw.coeff] using (CPolynomial.Raw.Trim.coeff_eq_coeff (res.2.reverse) 0)
+    have hmain : f * res.1 = f * (CPolynomial.Raw.trim res.2.reverse)[0]?.getD 0 := by
+      rw [htrim0, hres]
+    simpa [n, a, step, res] using hmain
+
+theorem divByLinearY_coeff_zero {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) :
+  let quot := (divByLinearY Q f).1
+  let rem := (divByLinearY Q f).2
+  (toPoly Q).coeff 0 = rem.toPoly - (toPoly quot).coeff 0 * f.toPoly := by
+  dsimp
+  let quot := (divByLinearY Q f).1
+  let rem := (divByLinearY Q f).2
+  have hrem := divByLinearY_rem_formula Q f
+  dsimp at hrem
+  have hrem' := congrArg CPolynomial.toPoly hrem
+  rw [CPolynomial.toPoly_add, CPolynomial.toPoly_mul] at hrem'
+  rw [CBivariate.toPoly_coeff, CBivariate.toPoly_coeff]
+  rw [hrem']
+  ring_nf
+
+theorem divX_eq_C_coeff_one_of_natDegreeY_one {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (h : natDegreeY Q = 1) :
+  CPolynomial.divX Q = CPolynomial.C (CPolynomial.coeff Q 1) := by
+  apply CPolynomial.eq_iff_coeff.mpr
+  intro i
+  rw [CPolynomial.coeff_divX, CPolynomial.coeff_C]
+  cases i with
+  | zero =>
+      simp
+  | succ k =>
+      have hdeg : (CBivariate.toPoly Q).natDegree = 1 := by
+        simpa [h] using (CBivariate.natDegreeY_toPoly (f := Q))
+      have hlt : (CBivariate.toPoly Q).natDegree < k + 2 := by
+        rw [hdeg]
+        omega
+      have hzero_toPoly : (CPolynomial.coeff Q (k + 2)).toPoly = 0 := by
+        simpa [CBivariate.toPoly_coeff] using
+          (Polynomial.coeff_eq_zero_of_natDegree_lt (p := CBivariate.toPoly Q) (n := k + 2) hlt)
+      have hzero : CPolynomial.coeff Q (k + 2) = 0 := by
+        exact (CPolynomial.toPoly_eq_zero_iff (CPolynomial.coeff Q (k + 2))).mp hzero_toPoly
+      simpa using hzero
+
+theorem divX_zero_of_natDegreeY_zero {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (h : natDegreeY Q = 0) :
+  CPolynomial.divX Q = 0 := by
+  rw [CPolynomial.eq_zero_iff_coeff_zero]
+  intro i
+  rw [CPolynomial.coeff_divX]
+  apply (CPolynomial.toPoly_eq_zero_iff (p := CPolynomial.coeff Q (i + 1))).mp
+  rw [← CBivariate.toPoly_coeff]
+  have hdeg : (toPoly Q).natDegree = 0 := by
+    rw [CBivariate.natDegreeY_toPoly, h]
+  exact Polynomial.coeff_eq_zero_of_natDegree_lt (by rw [hdeg]; omega)
+
+theorem raw_trim_reverse_push_coeff_succ {R : Type*} [Zero R] [BEq R] [LawfulBEq R] (arr : Array R) (a : R) (j : ℕ) :
+  CPolynomial.Raw.coeff (CPolynomial.Raw.trim ((arr.push a).reverse)) (j + 1) =
+    CPolynomial.Raw.coeff (CPolynomial.Raw.trim (arr.reverse)) j := by
+  rw [CPolynomial.Raw.Trim.coeff_eq_coeff, CPolynomial.Raw.Trim.coeff_eq_coeff]
+  rw [Array.reverse_push]
+  unfold CPolynomial.Raw.coeff
+  rw [Array.getD_eq_getD_getElem?, Array.getD_eq_getD_getElem?]
+  have h1 : (#[a] : Array R).size ≤ j + 1 := by simp
+  rw [Array.getElem?_append_right (xs := #[a]) (ys := arr.reverse) (i := j + 1) h1]
+  simp
+
+theorem divByLinearY_divX_quot_coeff {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) (j : ℕ) :
+  let quot := (divByLinearY Q f).1
+  CPolynomial.coeff ((divByLinearY (CPolynomial.divX Q) f).1) j = CPolynomial.coeff quot (j + 1) := by
+  -- Prove the coefficient-level version of `divX`-compatibility directly.
+  -- 
+  -- Let `quot := (divByLinearY Q f).1` and split on `n := natDegreeY Q`.
+  -- 
+  -- 1. **`n = 0`**:
+  --    Use `divX_zero_of_natDegreeY_zero Q h0` to rewrite `CPolynomial.divX Q = 0`.
+  --    Then apply `divByLinearY_const (a := 0) (f := f)` (or just simplify) to get that the shifted-input quotient is `0`.
+  --    Since `Q` is constant, the original quotient is also `0`, so the right side is `CPolynomial.coeff 0 (j+1) = 0`.
+  -- 
+  -- 2. **`n = 1`**:
+  --    Use `divX_eq_C_coeff_one_of_natDegreeY_one Q h1` to rewrite `CPolynomial.divX Q` as the constant polynomial
+  --    `CPolynomial.C (CPolynomial.coeff Q 1)`, and then use `divByLinearY_const (a := CPolynomial.coeff Q 1) (f := f)`
+  --    to conclude that the shifted-input quotient is `0`.
+  --    Rewrite the original quotient with `divByLinearY_quot_of_natDegreeY_one Q f h1`.
+  --    Then coefficient `j+1` of that constant quotient is `0`, so both sides are `0`.
+  -- 
+  -- 3. **`1 < n`**:
+  --    Define
+  --    * `a j := CPolynomial.coeff Q j`,
+  --    * `step (b, acc) k := let bj := a (n - 1 - k) + f * b; (bj, acc.push bj)`,
+  --    * `res1 := (List.range (n - 2)).foldl step (a n, #[(a n)])`,
+  --    * `r1 := a 1 + f * res1.1`.
+  -- 
+  --    Use `divByLinearY_fold_split Q f h` to rewrite the full fold in `divByLinearY Q f` as `(r1, res1.2.push r1)`.
+  --    After rewriting coefficients of `CPolynomial.divX Q` by `CPolynomial.coeff_divX`, the quotient of
+  --    `divByLinearY (CPolynomial.divX Q) f` is `⟨(res1.2.reverse).trim, _⟩`, while the original quotient is
+  --    `⟨((res1.2.push r1).reverse).trim, _⟩`.
+  --    Now apply `raw_trim_reverse_push_coeff_succ (arr := res1.2) (a := r1) (j := j)`.
+  --    This is exactly the required coefficient shift from `j+1` in the original quotient to `j` in the shifted-input quotient.
+  -- 
+  -- Thus all small-degree boundary cases are delegated to dedicated lemmas, and the `1 < n` branch is exactly the fold-split + raw-shift computation.
+  sorry
+
+theorem raw_trim_reverse_push_coeff_zero {R : Type*} [Zero R] [BEq R] [LawfulBEq R] (arr : Array R) (a : R) :
+  CPolynomial.Raw.coeff (CPolynomial.Raw.trim ((arr.push a).reverse)) 0 = a := by
+  rw [CPolynomial.Raw.Trim.coeff_eq_coeff]
+  rw [Array.reverse_push]
+  simp [CPolynomial.Raw.coeff, Array.getD_eq_getD_getElem?]
+
+theorem divByLinearY_divX_rem {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) :
+  let quot := (divByLinearY Q f).1
+  (divByLinearY (CPolynomial.divX Q) f).2 = CPolynomial.coeff quot 0 := by
+  -- Prove that the remainder after first applying outer `divX` is the constant coefficient of the original synthetic-division quotient.
+  -- 
+  -- Let `quot := (divByLinearY Q f).1` and split on `n := natDegreeY Q`.
+  -- 
+  -- 1. **`n = 0`**:
+  --    Use `divX_zero_of_natDegreeY_zero Q h0` to rewrite `CPolynomial.divX Q = 0`.
+  --    Then `divByLinearY_const (a := 0) (f := f)` gives the shifted-input division as `(0,0)`.
+  --    The original quotient is `0` as well, so its coefficient `0` is `0`.
+  -- 
+  -- 2. **`n = 1`**:
+  --    Use `divX_eq_C_coeff_one_of_natDegreeY_one Q h1` to rewrite `CPolynomial.divX Q` as the constant polynomial
+  --    `CPolynomial.C (CPolynomial.coeff Q 1)`.
+  --    Then `divByLinearY_const (a := CPolynomial.coeff Q 1) (f := f)` gives the shifted-input remainder as `CPolynomial.coeff Q 1`.
+  --    Rewrite the original quotient by `divByLinearY_quot_of_natDegreeY_one Q f h1`; its coefficient `0` is also `CPolynomial.coeff Q 1`.
+  -- 
+  -- 3. **`1 < n`**:
+  --    Define `a`, `step`, `res1`, and `r1 := a 1 + f * res1.1` exactly as in `divByLinearY_divX_quot_coeff`.
+  --    Use `divByLinearY_fold_split Q f h` to rewrite the full fold in `divByLinearY Q f` as `(r1, res1.2.push r1)`.
+  --    After rewriting coefficients of `CPolynomial.divX Q` by `CPolynomial.coeff_divX`, the unfolded definition of
+  --    `divByLinearY (CPolynomial.divX Q) f` shows that its remainder is exactly `r1`.
+  --    The original quotient is built from `((res1.2.push r1).reverse).trim`, and
+  --    `raw_trim_reverse_push_coeff_zero (arr := res1.2) (a := r1)` reads off its constant coefficient as `r1`.
+  -- 
+  -- So the small-degree branches are solved by dedicated boundary lemmas, and the genuine computation is only the `1 < n` branch.
+  sorry
+
+theorem divByLinearY_quot_recurrence {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) (j : ℕ) :
+  let quot := (divByLinearY Q f).1
+  CPolynomial.coeff quot j = CPolynomial.coeff Q (j + 1) + f * CPolynomial.coeff quot (j + 1) := by
+  dsimp
+  induction j generalizing Q with
+  | zero =>
+      have h := divByLinearY_rem_formula (Q := CPolynomial.divX Q) (f := f)
+      dsimp at h
+      rw [divByLinearY_divX_rem (Q := Q) (f := f)] at h
+      rw [divByLinearY_divX_quot_coeff (Q := Q) (f := f) 0] at h
+      rw [CPolynomial.coeff_divX] at h
+      simpa using h
+  | succ j ih =>
+      have h := ih (Q := CPolynomial.divX Q)
+      rw [divByLinearY_divX_quot_coeff (Q := Q) (f := f) j,
+        divByLinearY_divX_quot_coeff (Q := Q) (f := f) (j + 1),
+        CPolynomial.coeff_divX] at h
+      simpa [Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using h
+
+theorem divByLinearY_coeff_succ {R : Type*} [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R] (Q : CBivariate R) (f : CPolynomial R) (j : ℕ) :
+  let quot := (divByLinearY Q f).1
+  (toPoly Q).coeff (j + 1) = (toPoly quot).coeff j - (toPoly quot).coeff (j + 1) * f.toPoly := by
+  classical
+  dsimp
+  let quot := (divByLinearY Q f).1
+  have hraw : CPolynomial.coeff quot j = CPolynomial.coeff Q (j + 1) + f * CPolynomial.coeff quot (j + 1) := by
+    simpa [quot] using divByLinearY_quot_recurrence (Q := Q) (f := f) (j := j)
+  have hpoly : (toPoly quot).coeff j = (toPoly Q).coeff (j + 1) + f.toPoly * (toPoly quot).coeff (j + 1) := by
+    rw [CBivariate.toPoly_coeff, CBivariate.toPoly_coeff, CBivariate.toPoly_coeff]
+    simpa [CPolynomial.toPoly_add, CPolynomial.toPoly_mul] using congrArg CPolynomial.toPoly hraw
+  rw [eq_sub_iff_add_eq]
+  simpa [quot, mul_comm] using hpoly.symm
+
 theorem divByLinearY_spec [CommRing R] [BEq R] [LawfulBEq R] [Nontrivial R] [DecidableEq R]
     (Q : CBivariate R) (f : CPolynomial R) :
     let quot := (divByLinearY Q f).1
     let rem := (divByLinearY Q f).2
     toPoly Q = toPoly quot * (Polynomial.X - Polynomial.C (f.toPoly)) +
         Polynomial.C (rem.toPoly) := by
-  sorry
+  dsimp
+  apply Polynomial.ext
+  intro n
+  cases n with
+  | zero =>
+      simp only [Polynomial.coeff_add, Polynomial.mul_coeff_zero, Polynomial.coeff_C,
+        Polynomial.coeff_X_zero, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
+      simpa [sub_eq_add_neg, add_assoc, add_left_comm, add_comm] using divByLinearY_coeff_zero Q f
+  | succ j =>
+      simp only [Polynomial.coeff_add, Polynomial.coeff_C, Polynomial.coeff_mul_X_sub_C]
+      simpa using divByLinearY_coeff_succ Q f j
+
 
 -- Follows from divByLinearY_rem_eq_eval + isLinearYFactor_iff:
 -- isLinearYFactor Q f = true ↔ evalYPoly f Q = 0, and rem = evalYPoly f Q

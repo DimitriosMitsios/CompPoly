@@ -136,8 +136,7 @@ def basisSucc (k : ℕ) : Basis (Fin 2) (ConcreteBTField k) (ConcreteBTField (k 
       rw [←h_add_smul]
       unfold join_via_add_smul
       simp only [Nat.add_one_sub_one]
-      rw [algebraMap, Algebra.algebraMap, ConcreteBTFieldAlgebra_def]
-      simp only
+      simp only [RingHom.algebraMap_toAlgebra]
       simp only [generator]
       rw [add_comm]
       congr -- .Q.E.D
@@ -422,8 +421,8 @@ lemma algebraMap_𝕏_eq_of_index_eq (r k m : ℕ) (h_k_le : k + 1 ≤ r) (h_m_l
     (h_eq : k = m) :
     letI := ConcreteBTFieldAlgebra (l := k + 1) (r := r) (h_le := h_k_le)
     letI := ConcreteBTFieldAlgebra (l := m + 1) (r := r) (h_le := h_m_le)
-    (Algebra.algebraMap (𝕏 k) : ConcreteBTField r) =
-      (Algebra.algebraMap (𝕏 m) : ConcreteBTField r) := by
+    (algebraMap _ _ (𝕏 k) : ConcreteBTField r) =
+      (algebraMap _ _ (𝕏 m) : ConcreteBTField r) := by
   subst h_eq
   rfl
 
@@ -545,37 +544,43 @@ theorem multilinearBasis_apply (r : ℕ) : ∀ l : ℕ, (h_le : l ≤ r) → ∀
         rw [Fin.prod_univ_castSucc]
         simp only [Fin.val_cast, Fin.val_castSucc, Fin.val_last]
 
-      simp_rw [algebraMap.coe_pow]
       simp_rw [algebraMap.coe_prod]
-      unfold Algebra.cast
-      rw! (castMode:=.all) [←algebraMap]
-      conv_lhs =>
-        rw [←Fin.prod_congr' (b:=r1 - l) (a:=prevDiff) (h:=by omega)]
-        simp only [Fin.val_cast]
-      simp (config := { failIfUnchanged := false }) only [algebraMap, instAlgebraSucc]
-      erw [RingHom.map_pow]
-      simp (config := { failIfUnchanged := false }) only [←ConcreteBTFieldAlgebra_apply_assoc]
-      ------------------ Equality of bit-based powers of generators -----------------
-      have hfinProd_msb := bit_revFinProdFinEquiv_symm_2_pow_succ (n:=prevDiff)
-        (i:=⟨prevDiff, by omega⟩) (j:=⟨j, by omega⟩)
-      simp only [lt_self_iff_false, ↓reduceIte, revFinProdFinEquiv_symm_apply] at hfinProd_msb
-      conv_rhs => simp only [hfinProd_msb, leftDivNat]
-      --- Inner-prod term: prove equality of the two factors
-      refine congr_arg₂ (· * ·) ?_ ?_
-      · congr 1
-        funext i
-        have hfinProd_lsb := bit_revFinProdFinEquiv_symm_2_pow_succ
-          (n:=prevDiff) (i:=⟨i, by omega⟩)
-          (j:=⟨j, by omega⟩)
-        simp only [Fin.is_lt, ↓reduceIte, revFinProdFinEquiv_symm_apply] at hfinProd_lsb
-        rw [hfinProd_lsb]
-        rfl
-      · have h_exp_eq : (↑j : ℕ) / 2 ^ (r - l - 1) = (↑j : ℕ) / 2 ^ prevDiff :=
-          congr_arg (fun d => (↑j : ℕ) / 2 ^ d) h_prevDiff.symm
-        refine congr_arg₂ (· ^ ·)
-            (algebraMap_𝕏_eq_of_index_eq r r1 (l + prevDiff) (by omega) (by omega)
-              h_r1_eq_l_plus_prevDiff)
-            h_exp_eq
+      have h_cast_j : 2 ^ (prevDiff + 1) = 2 ^ (r - l) := by
+        rw [h_r_sub_l]
+      have h_low_bits (x : Fin prevDiff) :
+          Nat.getBit x.val (leftModNat (m:=2 ^ prevDiff) (n:=2)
+            (by exact Nat.two_pow_pos prevDiff) (i:=Fin.cast h2.symm j)).val =
+            Nat.getBit x.val j.val := by
+        have hbits := bit_revFinProdFinEquiv_symm_2_pow_succ
+          (n:=prevDiff) (j:=Fin.cast h_cast_j.symm j) (i:=Fin.castSucc x)
+        simpa only [Fin.val_castSucc, Fin.val_cast, Fin.is_lt, ↓reduceIte,
+          revFinProdFinEquiv_symm_apply] using hbits.symm
+      have h_top_bit :
+          j.val / 2 ^ (r - l - 1) = Nat.getBit prevDiff j.val := by
+        have hbits := bit_revFinProdFinEquiv_symm_2_pow_succ
+          (n:=prevDiff) (j:=Fin.cast h_cast_j.symm j) (i:=Fin.last prevDiff)
+        simpa only [Fin.val_last, Fin.val_cast, lt_self_iff_false, ↓reduceIte,
+          revFinProdFinEquiv_symm_apply, leftDivNat, h_prevDiff]
+          using hbits.symm
+      rw! (castMode:=.all) [h_r1_eq_l_plus_prevDiff, h_top_bit]
+      rw! (castMode:=.all) [show l + prevDiff - l = prevDiff by omega]
+      congr 1
+      apply congrArg (fun f : Fin prevDiff → ConcreteBTField r =>
+        (Finset.univ : Finset (Fin prevDiff)).prod f)
+      funext x
+      rw [h_low_bits x]
+      convert (ConcreteBTFieldAlgebra_apply_assoc (l:=l + x.val + 1) (mid:=r1) (r:=r)
+        (h_l_le_mid:=by omega) (h_mid_le_r:=by omega)
+        ((𝕏 (l + x.val)) ^ Nat.getBit x.val j.val)).symm using 1
+      rw! (castMode:=.all) [show r = r1 + 1 by omega]
+      rw! (castMode:=.all) [←h_r1_eq_l_plus_prevDiff]
+      change (algebraMap (ConcreteBTField r1) (ConcreteBTField (r1 + 1)))
+          (((@ConcreteBTFieldAlgebra (l:=l + x.val + 1) (r:=r1) (h_le:=by omega)).algebraMap)
+            (𝕏 (l + x.val) ^ Nat.getBit x.val j.val)) =
+        (algebraMap (ConcreteBTField r1) (ConcreteBTField (r1 + 1)))
+          (((@ConcreteBTFieldAlgebra (l:=l + x.val + 1) (r:=r1) (h_le:=by omega)).algebraMap)
+            (𝕏 (l + x.val) ^ Nat.getBit x.val j.val))
+      rfl
 
 end ConcreteMultilinearBasis
 

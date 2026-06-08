@@ -174,7 +174,7 @@ lemma algebraMap_𝕏_eq_of_index_eq (r k m : ℕ) (h_k_le : k + 1 ≤ r) (h_m_l
     (h_eq : k = m) :
     letI := binaryAlgebraTower (l := k + 1) (r := r) (h_le := h_k_le)
     letI := binaryAlgebraTower (l := m + 1) (r := r) (h_le := h_m_le)
-    (Algebra.algebraMap (𝕏 k) : BTField r) = (Algebra.algebraMap (𝕏 m) : BTField r) := by
+    (algebraMap _ _ (𝕏 k) : BTField r) = (algebraMap _ _ (𝕏 m) : BTField r) := by
   subst h_eq
   rfl
 
@@ -299,38 +299,50 @@ theorem multilinearBasis_apply (r : ℕ) : ∀ l : ℕ, (h_le : l ≤ r) → ∀
         rw [Fin.prod_univ_castSucc] -- split the prod of rhs
         simp only [Fin.val_cast, Fin.val_castSucc, Fin.val_last]
 
-      simp_rw [algebraMap.coe_pow] -- rhs
       simp_rw [algebraMap.coe_prod] -- lhs
-      unfold Algebra.cast
-      rw! (castMode:=.all) [←algebraMap]
-      conv_lhs =>
-        rw [←Fin.prod_congr' (b:=r1-l) (a:=prevDiff) (h:=by omega)]
-        simp only [Fin.val_cast]
-      simp (config := { failIfUnchanged := false }) only [algebraMap, instAlgebraSucc]
-      erw [RingHom.map_pow]
-      simp (config := { failIfUnchanged := false }) only [←binaryTowerAlgebra_apply_assoc]
-      ------------------ Equality of bit-based powers of generators -----------------
-      --- The outtermost term
-      have hfinProd_msb := bit_revFinProdFinEquiv_symm_2_pow_succ (n:=prevDiff)
-        (i:=⟨prevDiff, by omega⟩) (j:=⟨j, by omega⟩)
-      simp only [lt_self_iff_false, ↓reduceIte, revFinProdFinEquiv_symm_apply] at hfinProd_msb
-      conv_rhs => simp only [hfinProd_msb, leftDivNat]
-      --- Inner-prod term: prove equality of the two factors
-      refine congr_arg₂ (· * ·) ?_ ?_
-      · congr 1
-        funext i
-        have hfinProd_lsb := bit_revFinProdFinEquiv_symm_2_pow_succ
-          (n:=prevDiff) (i:=⟨i, by omega⟩)
-          (j:=⟨j, by omega⟩)
-        simp only [Fin.is_lt, ↓reduceIte, revFinProdFinEquiv_symm_apply] at hfinProd_lsb
-        rw [hfinProd_lsb]
-        rfl
-      · have h_exp_eq : (↑j : ℕ) / 2 ^ (r - l - 1) = (↑j : ℕ) / 2 ^ prevDiff :=
-          congr_arg (fun d => (↑j : ℕ) / 2 ^ d) h_prevDiff.symm
-        refine congr_arg₂ (· ^ ·)
-            (algebraMap_𝕏_eq_of_index_eq r r1 (l + prevDiff) (by omega) (by omega)
-              h_r1_eq_l_plus_prevDiff)
-            h_exp_eq
+      have h_cast_j : 2 ^ (prevDiff + 1) = 2 ^ (r - l) := by
+        rw [h_r_sub_l]
+      have h_low_bits (x : Fin prevDiff) :
+          Nat.getBit x.val (leftModNat (m:=2 ^ prevDiff) (n:=2)
+            (by exact Nat.two_pow_pos prevDiff) (i:=Fin.cast h2.symm j)).val =
+            Nat.getBit x.val j.val := by
+        have hbits := bit_revFinProdFinEquiv_symm_2_pow_succ
+          (n:=prevDiff) (j:=Fin.cast h_cast_j.symm j) (i:=Fin.castSucc x)
+        simpa only [Fin.val_castSucc, Fin.val_cast, Fin.is_lt, ↓reduceIte,
+          revFinProdFinEquiv_symm_apply] using hbits.symm
+      have h_top_bit :
+          j.val / 2 ^ (r - l - 1) = Nat.getBit prevDiff j.val := by
+        have hbits := bit_revFinProdFinEquiv_symm_2_pow_succ
+          (n:=prevDiff) (j:=Fin.cast h_cast_j.symm j) (i:=Fin.last prevDiff)
+        simpa only [Fin.val_last, Fin.val_cast, lt_self_iff_false, ↓reduceIte,
+          revFinProdFinEquiv_symm_apply, leftDivNat, h_prevDiff]
+          using hbits.symm
+      rw! (castMode:=.all) [h_r1_eq_l_plus_prevDiff, h_top_bit]
+      rw! (castMode:=.all) [show l + prevDiff - l = prevDiff by omega]
+      congr 1
+      apply congrArg (fun f : Fin prevDiff → BTField r =>
+        (Finset.univ : Finset (Fin prevDiff)).prod f)
+      funext x
+      rw [h_low_bits x]
+      convert (binaryTowerAlgebra_apply_assoc (l:=l + x.val + 1) (mid:=r1) (r:=r)
+        (h_l_le_mid:=by omega) (h_mid_le_r:=by omega)
+        ((𝕏 (l + x.val)) ^ Nat.getBit x.val j.val)).symm using 1
+      rw! (castMode:=.all) [show r = r1 + 1 by omega]
+      convert (coe_eq_algebraMap_adjacent_tower r1
+        (((@binaryAlgebraTower (l:=l + x.val + 1) (r:=r1) (h_le:=by omega)).algebraMap)
+          (𝕏 (l + x.val) ^ Nat.getBit x.val j.val))) using 1
+      rw! (castMode:=.all) [←h_r1_eq_l_plus_prevDiff]
+      rw! (castMode:=.all) [hr]
+      simp only [eq_mp_eq_cast]
+      erw [cast_eq]
+      change (algebraMap (BTField r1) (BTField (r1 + 1)))
+          (((@binaryAlgebraTower (l:=l + x.val + 1) (r:=r1) (h_le:=by omega)).algebraMap)
+            (𝕏 (l + x.val) ^ Nat.getBit x.val j.val)) =
+        (AdjoinRoot.of (poly r1))
+          (((@binaryAlgebraTower (l:=l + x.val + 1) (r:=r1) (h_le:=by omega)).algebraMap)
+            (𝕏 (l + x.val) ^ Nat.getBit x.val j.val))
+      rw [algebraMap_adjacent_tower_succ_eq_Adjoin_of]
+      rfl
 
 end MultilinearBasis
 
